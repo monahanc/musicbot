@@ -11,6 +11,11 @@ logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 UPLOADS_DIR = Path("uploads").resolve()
+ALLOWED_EXTENSIONS = {"mp3", "m4a", "wav", "flac", "ogg", "aac", "opus", "wma"}
+
+
+def is_allowed_audio_file(filename: str) -> bool:
+    return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
 class Music(commands.Cog):
@@ -134,6 +139,32 @@ class Music(commands.Cog):
             await ctx.send(f"File does not exist: `{query}`")
 
     @commands.hybrid_command()
+    async def playfile(self, ctx: commands.Context, file: discord.Attachment):
+        """Uploads and plays an audio file directly."""
+
+        filename = Path(file.filename).name
+        if not is_allowed_audio_file(filename):
+            await ctx.send(f"Unsupported file extension in file `{filename}`")
+            return
+
+        file_path = (UPLOADS_DIR / filename).resolve()
+        try:
+            await file.save(file_path)
+        except (discord.HTTPException, OSError) as e:
+            logger.error("Failed to save file %s: %s", filename, e)
+            await ctx.send(f"Failed to save `{filename}`")
+            return
+
+        source = discord.PCMVolumeTransformer(discord.FFmpegPCMAudio(str(file_path)))
+
+        def _after(err):
+            if err:
+                logger.error("Player error: %s", err)
+
+        ctx.voice_client.play(source, after=_after)
+        await ctx.send(f"Now playing: `{filename}`")
+
+    @commands.hybrid_command()
     async def volume(self, ctx: commands.Context, volume: int):
         """Changes the player's volume"""
 
@@ -157,6 +188,7 @@ class Music(commands.Cog):
         await ctx.send("Disconnected from voice channel.")
 
     @play.before_invoke
+    @playfile.before_invoke
     async def ensure_voice(self, ctx: commands.Context):
         await ctx.defer()
         if ctx.voice_client is None:
@@ -211,63 +243,6 @@ async def on_ready():
     print(f"Synced {len(synced)} slash command(s)")
     print(f"Logged in as {bot.user} (ID: {bot.user.id})")
     print("------")
-
-
-@bot.event
-async def on_message(message):
-    # Ignore messages from the bot itself to prevent infinite loops
-    if message.author == bot.user:
-        return
-
-    # Check if the message was sent in a DM channel
-    if isinstance(message.channel, discord.DMChannel):
-        print(f"Received DM from {message.author}: {message.content}")
-        await message.channel.send(f"I received your DM: {message.content}")
-
-        # Check for attachments
-        if message.attachments:
-            print(f"Found {len(message.attachments)} attachment(s).")
-            allowed_extensions = {
-                "mp3",
-                "m4a",
-                "wav",
-                "flac",
-                "ogg",
-                "aac",
-                "opus",
-                "wma",
-            }
-
-            def allowed_file(filename):
-                return (
-                    "." in filename
-                    and filename.rsplit(".", 1)[1].lower() in allowed_extensions
-                )
-
-            for attachment in message.attachments:
-                if allowed_file(attachment.filename):
-                    # You can access properties like attachment.filename, attachment.url, attachment.size
-                    print(f"Downloading file: {attachment.filename}")
-                    try:
-                        # Save the file to disk
-                        await attachment.save(str(UPLOADS_DIR / attachment.filename))
-                        print(f"Successfully saved {attachment.filename}")
-                        await message.channel.send(f"Saved! {attachment.filename}")
-                    except (discord.HTTPException, OSError) as e:
-                        print(f"Failed to save file: {e}")
-                        await message.channel.send(
-                            f"Failed to save {attachment.filename}"
-                        )
-                else:
-                    await message.channel.send(
-                        f"Unsupported file extension in file {attachment.filename}"
-                    )
-        else:
-            print("No file attachments in this DM.")
-
-    # This line is crucial! It allows your bot to process other commands
-    # you might have defined elsewhere in your code (e.g., those starting with '!')
-    await bot.process_commands(message)
 
 
 async def start_bot():
