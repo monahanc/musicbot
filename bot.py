@@ -1,15 +1,16 @@
-import os
-import logging
-logging.basicConfig(level=logging.DEBUG)
 import asyncio
-import discord
-from discord.ext import commands
+import logging
+import os
 from pathlib import Path
 
-UPLOADS_DIR = Path("uploads").resolve()
-
-
+import discord
 import yt_dlp
+from discord.ext import commands
+
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
+
+UPLOADS_DIR = Path("uploads").resolve()
 
 
 class Music(commands.Cog):
@@ -28,27 +29,29 @@ class Music(commands.Cog):
         await channel.connect()
 
     def is_youtube_url(self, url: str) -> bool:
-        return (url.startswith('http://') or url.startswith('https://')) and ('youtube.com' in url or 'youtu.be' in url)
+        return url.startswith(("http://", "https://")) and (
+            "youtube.com" in url or "youtu.be" in url
+        )
 
     @staticmethod
     def _get_youtube_video_id(url: str) -> str:
         from urllib.parse import parse_qs, urlparse
 
         parsed = urlparse(url)
-        hostname = parsed.hostname or ''
+        hostname = parsed.hostname or ""
 
-        if hostname in ('youtu.be', 'www.youtu.be'):
-            return parsed.path.lstrip('/')
+        if hostname in ("youtu.be", "www.youtu.be"):
+            return parsed.path.lstrip("/")
 
-        if hostname in ('youtube.com', 'www.youtube.com', 'm.youtube.com'):
+        if hostname in ("youtube.com", "www.youtube.com", "m.youtube.com"):
             qs = parse_qs(parsed.query)
-            if 'v' in qs:
-                return qs['v'][0]
-            if parsed.path.startswith('/shorts/'):
-                parts = parsed.path.strip('/').split('/')
-                return parts[1] if len(parts) > 1 else ''
+            if "v" in qs:
+                return qs["v"][0]
+            if parsed.path.startswith("/shorts/"):
+                parts = parsed.path.strip("/").split("/")
+                return parts[1] if len(parts) > 1 else ""
 
-        return ''
+        return ""
 
     def _get_cached_youtube_audio(self, url: str) -> str | None:
         video_id = self._get_youtube_video_id(url)
@@ -56,7 +59,7 @@ class Music(commands.Cog):
             return None
 
         for candidate in os.listdir(self.youtube_cache_dir):
-            if candidate.startswith(video_id + '.'):
+            if candidate.startswith(video_id + "."):
                 path = os.path.join(self.youtube_cache_dir, candidate)
                 if os.path.exists(path):
                     return path
@@ -64,19 +67,19 @@ class Music(commands.Cog):
 
     def download_youtube_audio(self, url: str) -> str:
         if yt_dlp is None:
-            raise RuntimeError('yt-dlp is not installed, please pip install yt-dlp')
+            raise RuntimeError("yt-dlp is not installed, please pip install yt-dlp")
 
         cached = self._get_cached_youtube_audio(url)
         if cached:
             return cached
 
         ydl_opts = {
-            'format': 'bestaudio/best',
-            'outtmpl': os.path.join(self.youtube_cache_dir, '%(id)s.%(ext)s'),
-            'quiet': True,
-            'noplaylist': True,
-            'nocheckcertificate': True,
-            'overwrites': False,
+            "format": "bestaudio/best",
+            "outtmpl": os.path.join(self.youtube_cache_dir, "%(id)s.%(ext)s"),
+            "quiet": True,
+            "noplaylist": True,
+            "nocheckcertificate": True,
+            "overwrites": False,
         }
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -86,7 +89,7 @@ class Music(commands.Cog):
         if cached:
             return cached
 
-        raise FileNotFoundError(f'Unable to locate downloaded YouTube audio for {url}')
+        raise FileNotFoundError(f"Unable to locate downloaded YouTube audio for {url}")
 
     @commands.command()
     async def play(self, ctx, *, query):
@@ -96,40 +99,47 @@ class Music(commands.Cog):
             cached = self._get_cached_youtube_audio(query)
             if cached:
                 path = cached
-                await ctx.send('Playing cached audio from YouTube.')
+                await ctx.send("Playing cached audio from YouTube.")
             else:
-                await ctx.send('Downloading audio from YouTube, please wait...')
+                await ctx.send("Downloading audio from YouTube, please wait...")
                 path = await asyncio.to_thread(self.download_youtube_audio, query)
 
             if not os.path.exists(path):
-                raise FileNotFoundError(f'Downloaded file not found at expected path: {path}')
+                raise FileNotFoundError(
+                    f"Downloaded file not found at expected path: {path}"
+                )
 
             source = discord.PCMVolumeTransformer(discord.FFmpegPCMAudio(str(path)))
+
             def _after(err):
                 if err:
-                    logging.error('Player error: %s', err)
+                    logger.error("Player error: %s", err)
 
             ctx.voice_client.play(source, after=_after)
-            await ctx.send(f'Now playing from YouTube: {query}')
+            await ctx.send(f"Now playing from YouTube: {query}")
             return
 
         file_path = (UPLOADS_DIR / query).resolve()
         if UPLOADS_DIR in file_path.parents and file_path.is_file():
-            source = discord.PCMVolumeTransformer(discord.FFmpegPCMAudio(str(file_path)))
-            ctx.voice_client.play(source, after=lambda e: print(f'Player error: {e}') if e else None)
-            await ctx.send(f'Now playing: `{query}`')
+            source = discord.PCMVolumeTransformer(
+                discord.FFmpegPCMAudio(str(file_path))
+            )
+            ctx.voice_client.play(
+                source, after=lambda e: print(f"Player error: {e}") if e else None
+            )
+            await ctx.send(f"Now playing: `{query}`")
         else:
-            await ctx.send(f'File does not exist: `{query}`')
+            await ctx.send(f"File does not exist: `{query}`")
 
     @commands.command()
     async def volume(self, ctx, volume: int):
         """Changes the player's volume"""
 
         if ctx.voice_client is None:
-            return await ctx.send('Not connected to a voice channel.')
+            return await ctx.send("Not connected to a voice channel.")
 
         ctx.voice_client.source.volume = volume / 100
-        await ctx.send(f'Changed volume to {volume}%')
+        await ctx.send(f"Changed volume to {volume}%")
 
     @commands.command()
     async def stop(self, ctx):
@@ -142,21 +152,22 @@ class Music(commands.Cog):
         if ctx.voice_client is None:
             if ctx.author.voice:
                 await ctx.author.voice.channel.connect()
-                await ctx.guild.change_voice_state(channel=ctx.author.voice.channel, self_mute=False, self_deaf=True)
+                await ctx.guild.change_voice_state(
+                    channel=ctx.author.voice.channel, self_mute=False, self_deaf=True
+                )
             else:
-                await ctx.send('You are not connected to a voice channel.')
-                raise commands.CommandError('Author not connected to a voice channel.')
+                await ctx.send("You are not connected to a voice channel.")
+                raise commands.CommandError("Author not connected to a voice channel.")
         elif ctx.voice_client.is_playing():
             ctx.voice_client.stop()
-
 
 
 intents = discord.Intents.default()
 intents.message_content = True
 
 bot = commands.Bot(
-    command_prefix=commands.when_mentioned_or('!'),
-    description='Relatively simple music bot example',
+    command_prefix=commands.when_mentioned_or("!"),
+    description="Relatively simple music bot example",
     intents=intents,
 )
 
@@ -166,8 +177,9 @@ async def on_ready():
     # Tell the type checker that User is filled up at this point
     assert bot.user is not None
 
-    print(f'Logged in as {bot.user} (ID: {bot.user.id})')
-    print('------')
+    print(f"Logged in as {bot.user} (ID: {bot.user.id})")
+    print("------")
+
 
 @bot.event
 async def on_message(message):
@@ -183,10 +195,24 @@ async def on_message(message):
         # Check for attachments
         if message.attachments:
             print(f"Found {len(message.attachments)} attachment(s).")
+            allowed_extensions = {
+                "mp3",
+                "m4a",
+                "wav",
+                "flac",
+                "ogg",
+                "aac",
+                "opus",
+                "wma",
+            }
+
+            def allowed_file(filename):
+                return (
+                    "." in filename
+                    and filename.rsplit(".", 1)[1].lower() in allowed_extensions
+                )
+
             for attachment in message.attachments:
-                ALLOWED_EXTENSIONS = {'mp3', 'm4a', 'wav', 'flac', 'ogg', 'aac', 'opus', 'wma'}
-                def allowed_file(filename):
-                    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
                 if allowed_file(attachment.filename):
                     # You can access properties like attachment.filename, attachment.url, attachment.size
                     print(f"Downloading file: {attachment.filename}")
@@ -195,22 +221,27 @@ async def on_message(message):
                         await attachment.save(str(UPLOADS_DIR / attachment.filename))
                         print(f"Successfully saved {attachment.filename}")
                         await message.channel.send(f"Saved! {attachment.filename}")
-                    except Exception as e:
+                    except (discord.HTTPException, OSError) as e:
                         print(f"Failed to save file: {e}")
-                        await message.channel.send(f"Failed to save {attachment.filename}")
+                        await message.channel.send(
+                            f"Failed to save {attachment.filename}"
+                        )
                 else:
-                    await message.channel.send(f"Unsupported file extension in file {attachment.filename}")
+                    await message.channel.send(
+                        f"Unsupported file extension in file {attachment.filename}"
+                    )
         else:
             print("No file attachments in this DM.")
-    
+
     # This line is crucial! It allows your bot to process other commands
     # you might have defined elsewhere in your code (e.g., those starting with '!')
     await bot.process_commands(message)
 
+
 async def start_bot():
-    token = os.getenv('DISCORD_BOT_TOKEN')
+    token = os.getenv("DISCORD_BOT_TOKEN")
     if not token:
-        raise ValueError('DISCORD_BOT_TOKEN environment variable is not set')
+        raise ValueError("DISCORD_BOT_TOKEN environment variable is not set")
 
     async with bot:
         await bot.add_cog(Music(bot))
@@ -221,5 +252,5 @@ def main():
     asyncio.run(start_bot())
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

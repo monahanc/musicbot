@@ -15,6 +15,7 @@ DISCORD_BOT_TOKEN = "your-token-here"
 
 ```sh
 just setup    # Install local Python dependencies with uv
+just format   # Lint and format code with ruff and black
 just run      # Run the bot locally
 just build    # Build Docker image locally
 just deploy   # Build and deploy to rubychan@nas via Docker Compose over SSH

@@ -1,6 +1,10 @@
 setup:
     uv sync
 
+format:
+    uv run ruff check --fix .
+    uv run black .
+
 run:
     mise exec -- uv run rubychan-bot
 
