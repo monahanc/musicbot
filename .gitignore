@@ -1,2 +1,22 @@
-/.*
+# Python / packaging
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+
+# Environment & secrets
+.env
+.env.*
+.config/
+mise.local.toml
+
+# Bot data
 /uploads
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

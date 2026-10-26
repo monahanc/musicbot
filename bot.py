@@ -154,10 +154,6 @@ class Music(commands.Cog):
 intents = discord.Intents.default()
 intents.message_content = True
 
-TOKEN = os.getenv('DISCORD_BOT_TOKEN')
-if not TOKEN:
-    raise ValueError('DISCORD_BOT_TOKEN environment variable is not set')
-
 bot = commands.Bot(
     command_prefix=commands.when_mentioned_or('!'),
     description='Relatively simple music bot example',
@@ -211,10 +207,19 @@ async def on_message(message):
     # you might have defined elsewhere in your code (e.g., those starting with '!')
     await bot.process_commands(message)
 
-async def main():
+async def start_bot():
+    token = os.getenv('DISCORD_BOT_TOKEN')
+    if not token:
+        raise ValueError('DISCORD_BOT_TOKEN environment variable is not set')
+
     async with bot:
         await bot.add_cog(Music(bot))
-        await bot.start(TOKEN)
+        await bot.start(token)
 
 
-asyncio.run(main())
+def main():
+    asyncio.run(start_bot())
+
+
+if __name__ == '__main__':
+    main()

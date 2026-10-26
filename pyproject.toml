@@ -14,7 +14,9 @@ classifiers = [
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
-    "Topic :: Communications :: Chat"
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Communications :: Chat",
 ]
 
 dependencies = [
@@ -24,3 +26,6 @@ dependencies = [
 
 [project.scripts]
 rubychan-bot = "bot:main"
+
+[tool.setuptools]
+py-modules = ["bot"]

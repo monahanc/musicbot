@@ -1,0 +1,13 @@
+services:
+  rubychan:
+    image: rubychan:latest
+    container_name: rubychan
+    restart: unless-stopped
+    environment:
+      DISCORD_BOT_TOKEN: ${DISCORD_BOT_TOKEN:?DISCORD_BOT_TOKEN is required}
+    volumes:
+      - type: bind
+        source: /home/rubychan/uploads
+        target: /app/uploads
+
+
