@@ -19,14 +19,16 @@ class Music(commands.Cog):
         self.youtube_cache_dir = UPLOADS_DIR
         os.makedirs(self.youtube_cache_dir, exist_ok=True)
 
-    @commands.command()
-    async def join(self, ctx, *, channel: discord.VoiceChannel):
+    @commands.hybrid_command()
+    async def join(self, ctx: commands.Context, *, channel: discord.VoiceChannel):
         """Joins a voice channel"""
 
         if ctx.voice_client is not None:
-            return await ctx.voice_client.move_to(channel)
+            await ctx.voice_client.move_to(channel)
+        else:
+            await channel.connect()
 
-        await channel.connect()
+        await ctx.send(f"Joined {channel.mention}")
 
     def is_youtube_url(self, url: str) -> bool:
         return url.startswith(("http://", "https://")) and (
@@ -91,8 +93,8 @@ class Music(commands.Cog):
 
         raise FileNotFoundError(f"Unable to locate downloaded YouTube audio for {url}")
 
-    @commands.command()
-    async def play(self, ctx, *, query):
+    @commands.hybrid_command()
+    async def play(self, ctx: commands.Context, *, query: str):
         """Plays a file from local filesystem, or downloads and plays YouTube when URL is passed."""
 
         if self.is_youtube_url(query):
@@ -131,24 +133,32 @@ class Music(commands.Cog):
         else:
             await ctx.send(f"File does not exist: `{query}`")
 
-    @commands.command()
-    async def volume(self, ctx, volume: int):
+    @commands.hybrid_command()
+    async def volume(self, ctx: commands.Context, volume: int):
         """Changes the player's volume"""
 
         if ctx.voice_client is None:
             return await ctx.send("Not connected to a voice channel.")
 
+        if ctx.voice_client.source is None:
+            return await ctx.send("Nothing is currently playing.")
+
         ctx.voice_client.source.volume = volume / 100
         await ctx.send(f"Changed volume to {volume}%")
 
-    @commands.command()
-    async def stop(self, ctx):
+    @commands.hybrid_command()
+    async def stop(self, ctx: commands.Context):
         """Stops and disconnects the bot from voice"""
 
+        if ctx.voice_client is None:
+            return await ctx.send("Not connected to a voice channel.")
+
         await ctx.voice_client.disconnect()
+        await ctx.send("Disconnected from voice channel.")
 
     @play.before_invoke
-    async def ensure_voice(self, ctx):
+    async def ensure_voice(self, ctx: commands.Context):
+        await ctx.defer()
         if ctx.voice_client is None:
             if ctx.author.voice:
                 await ctx.author.voice.channel.connect()
@@ -177,6 +187,8 @@ async def on_ready():
     # Tell the type checker that User is filled up at this point
     assert bot.user is not None
 
+    synced = await bot.tree.sync()
+    print(f"Synced {len(synced)} slash command(s)")
     print(f"Logged in as {bot.user} (ID: {bot.user.id})")
     print("------")
 
