@@ -171,6 +171,26 @@ class Music(commands.Cog):
         elif ctx.voice_client.is_playing():
             ctx.voice_client.stop()
 
+    @commands.Cog.listener()
+    async def on_voice_state_update(
+        self,
+        member: discord.Member,
+        before: discord.VoiceState,
+        after: discord.VoiceState,
+    ):
+        voice_client = member.guild.voice_client
+        if voice_client is None or voice_client.channel is None:
+            return
+
+        if (
+            before.channel == voice_client.channel
+            and after.channel != voice_client.channel
+            and not any(not m.bot for m in voice_client.channel.members)
+        ):
+            if voice_client.is_playing():
+                voice_client.stop()
+            await voice_client.disconnect()
+
 
 intents = discord.Intents.default()
 intents.message_content = True
