@@ -20,6 +20,7 @@ classifiers = [
 ]
 
 dependencies = [
+    "discord-ext-voice-recv>=0.5.2a179",
     "discord-py[voice]>=2.6.4",
     "yt-dlp>=2026.3.17",
 ]

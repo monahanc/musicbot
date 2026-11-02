@@ -15,6 +15,7 @@ mise.local.toml
 
 # Bot data
 /uploads
+/audio
 
 # Editor / OS
 .vscode/
