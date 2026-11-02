@@ -1,7 +1,9 @@
 import asyncio
 import audioop
+import hashlib
 import logging
 import os
+import ssl
 import struct
 import threading
 import time
@@ -20,7 +22,8 @@ UPLOADS_DIR = Path("uploads").resolve()
 AUDIO_DIR = Path(
     os.getenv("AUDIO_DIR", str(Path(__file__).with_name("audio")))
 ).resolve()
-WHISPER_URL = os.getenv("WHISPER_URL", "http://kasupc:8000").rstrip("/")
+WHISPER_URL = os.getenv("WHISPER_URL", "https://kasupc:8000").rstrip("/")
+WHISPER_CERT_FILE = Path(os.getenv("WHISPER_CERT_FILE", "certs/cert.pem"))
 WHISPER_RECONNECT_INTERVAL = 10.0
 CLIP_COOLDOWN_SECONDS = 1.0
 ALLOWED_EXTENSIONS = {"mp3", "m4a", "wav", "flac", "ogg", "aac", "opus", "wma"}
@@ -31,11 +34,16 @@ def is_allowed_audio_file(filename: str) -> bool:
 
 
 def get_whisper_ws_url(base_url: str) -> str:
-    if base_url.startswith("https://"):
-        return "wss://" + base_url[len("https://") :] + "/ws"
-    if base_url.startswith("http://"):
-        return "ws://" + base_url[len("http://") :] + "/ws"
-    return f"ws://{base_url}/ws"
+    return "wss://" + base_url.removeprefix("https://").rstrip("/") + "/ws"
+
+
+def get_whisper_ssl_verifier(
+    cert_path: Path = WHISPER_CERT_FILE,
+) -> aiohttp.Fingerprint:
+    raw_text = cert_path.read_text(encoding="ascii")
+    der_bytes = ssl.PEM_cert_to_DER_cert(raw_text)
+    fingerprint = hashlib.sha256(der_bytes).digest()
+    return aiohttp.Fingerprint(fingerprint)
 
 
 class InterruptiblePCMVolumeTransformer(discord.PCMVolumeTransformer):
@@ -268,8 +276,9 @@ class Music(commands.Cog):
                     self._http_session = aiohttp.ClientSession()
 
                 timeout = aiohttp.ClientTimeout(total=None, sock_connect=2.0)
+                ssl_verifier = get_whisper_ssl_verifier()
                 async with self._http_session.ws_connect(
-                    ws_url, timeout=timeout, heartbeat=15.0
+                    ws_url, timeout=timeout, heartbeat=15.0, ssl=ssl_verifier
                 ) as ws:
                     self._set_whisper_online(True)
 
@@ -308,6 +317,15 @@ class Music(commands.Cog):
                                 break
                     finally:
                         sender_task.cancel()
+            except aiohttp.ServerFingerprintMismatch as e:
+                logger.critical(
+                    "Whisper TLS security error: server certificate fingerprint (%s) does not match pinned certificate (%s) for %s:%d! Connection refused.",
+                    e.got.hex(),
+                    e.expected.hex(),
+                    e.host,
+                    e.port,
+                )
+                self._set_whisper_online(False)
             except asyncio.CancelledError:
                 break
             except (aiohttp.ClientError, asyncio.TimeoutError, OSError):

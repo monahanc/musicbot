@@ -2,9 +2,11 @@ import asyncio
 import logging
 import os
 import re
+import ssl
 import struct
 import time
 from dataclasses import dataclass, field
+from pathlib import Path
 
 import numpy as np
 from aiohttp import WSMsgType, web
@@ -17,6 +19,8 @@ MODEL_SIZE = os.getenv("WHISPER_MODEL", "small")
 DEVICE = os.getenv("WHISPER_DEVICE", "cuda")
 COMPUTE_TYPE = os.getenv("WHISPER_COMPUTE_TYPE", "float16")
 PORT = int(os.getenv("WHISPER_PORT", "8000"))
+SSL_CERT_PATH = Path(os.getenv("WHISPER_SSL_CERT", "certs/cert.pem"))
+SSL_KEY_PATH = Path(os.getenv("WHISPER_SSL_KEY", "certs/key.pem"))
 
 SAMPLE_RATE = 16000
 WINDOW_SECONDS = 2.5
@@ -344,9 +348,18 @@ def create_app() -> web.Application:
     return app
 
 
+def create_ssl_context() -> ssl.SSLContext:
+    ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    ctx.load_cert_chain(certfile=SSL_CERT_PATH, keyfile=SSL_KEY_PATH)
+    logger.info("Loaded SSL certificate %s and key %s", SSL_CERT_PATH, SSL_KEY_PATH)
+    return ctx
+
+
 def main():
     app = create_app()
-    web.run_app(app, host="0.0.0.0", port=PORT)
+    ssl_context = create_ssl_context()
+    logger.info("Starting Whisper server on https://0.0.0.0:%d", PORT)
+    web.run_app(app, host="0.0.0.0", port=PORT, ssl_context=ssl_context)
 
 
 if __name__ == "__main__":

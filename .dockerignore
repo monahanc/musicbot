@@ -12,6 +12,10 @@ build
 dist
 uploads
 audio
+certs
+*.key
+*.pem
+*.crt
 .env
 .env.*
 .config
