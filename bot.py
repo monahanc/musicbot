@@ -301,13 +301,6 @@ class Music(commands.Cog):
                                     for vc in self.bot.voice_clients:
                                         if vc.is_connected():
                                             await self.trigger_clip(vc, clip_name)
-                                elif text:
-                                    logger.debug(
-                                        "Transcript from user %s (%sms): %r",
-                                        user_id,
-                                        latency_ms,
-                                        text,
-                                    )
                             elif msg.type in (
                                 aiohttp.WSMsgType.CLOSED,
                                 aiohttp.WSMsgType.ERROR,

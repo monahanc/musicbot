@@ -1,11 +1,9 @@
 import asyncio
-import io
 import logging
 import os
 import re
 import struct
 import time
-import wave
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -169,24 +167,6 @@ def load_model() -> tuple[WhisperModel, str]:
     return model, actual_device
 
 
-def wav_bytes_to_float32_16k(data: bytes) -> np.ndarray:
-    with wave.open(io.BytesIO(data), "rb") as w:
-        rate = w.getframerate()
-        channels = w.getnchannels()
-        pcm = w.readframes(w.getnframes())
-
-    arr = np.frombuffer(pcm, dtype=np.int16).astype(np.float32) / 32768.0
-    if channels > 1:
-        arr = arr.reshape(-1, channels).mean(axis=1)
-    if rate == 48000:
-        arr = arr[::3]
-    elif rate != 16000 and len(arr) > 0:
-        x_old = np.linspace(0.0, 1.0, len(arr), endpoint=False)
-        x_new = np.linspace(0.0, 1.0, int(len(arr) * 16000 / rate), endpoint=False)
-        arr = np.interp(x_new, x_old, arr).astype(np.float32)
-    return arr
-
-
 def transcribe_array(
     model: WhisperModel, audio: np.ndarray, language: str | None = "en"
 ) -> str:
@@ -209,28 +189,19 @@ def transcribe_array(
     for seg in segments:
         if seg.no_speech_prob > MAX_NO_SPEECH_PROB:
             logger.debug(
-                "Rejected high no_speech_prob (%.2f): %r",
+                "Rejected high no_speech_prob (%.2f)",
                 seg.no_speech_prob,
-                seg.text,
             )
             continue
         if seg.avg_logprob < MIN_AVG_LOGPROB:
             logger.debug(
-                "Rejected low avg_logprob (%.2f): %r",
+                "Rejected low avg_logprob (%.2f)",
                 seg.avg_logprob,
-                seg.text,
             )
             continue
         if seg.text.strip():
             valid_texts.append(seg.text.strip())
     return " ".join(valid_texts).strip()
-
-
-def transcribe_bytes(
-    model: WhisperModel, data: bytes, language: str | None = "en"
-) -> str:
-    audio = wav_bytes_to_float32_16k(data)
-    return transcribe_array(model, audio, language)
 
 
 async def handle_health(request: web.Request) -> web.Response:
@@ -239,31 +210,6 @@ async def handle_health(request: web.Request) -> web.Response:
             "status": "ok",
             "model": MODEL_SIZE,
             "device": request.app["device"],
-        }
-    )
-
-
-async def handle_transcribe(request: web.Request) -> web.Response:
-    data = await request.read()
-    if not data:
-        return web.json_response({"error": "empty audio payload"}, status=400)
-
-    language = request.query.get("language", "en") or None
-    state = request.query.get("state") or None
-    model: WhisperModel = request.app["model"]
-    lock: asyncio.Lock = request.app["lock"]
-
-    async with lock:
-        text = await asyncio.to_thread(transcribe_bytes, model, data, language)
-
-    matched = match_aiscream_trigger(text, state)
-    logger.info("Transcribed (%d bytes): %r -> %s", len(data), text, matched)
-    return web.json_response(
-        {
-            "text": text,
-            "trigger": matched is not None,
-            "state": matched[0] if matched else state,
-            "clip": matched[1] if matched else None,
         }
     )
 
@@ -333,7 +279,7 @@ async def handle_ws(request: web.Request) -> web.WebSocketResponse:
                 dt_ms = (time.perf_counter() - t0) * 1000.0
 
                 matched = match_aiscream_trigger(text, current_state)
-                if text:
+                if matched is not None:
                     logger.info(
                         "Stream [user=%s, state=%s, %.2fs, %.0fms]: %r -> %s",
                         user_id,
@@ -343,8 +289,6 @@ async def handle_ws(request: web.Request) -> web.WebSocketResponse:
                         text,
                         matched,
                     )
-
-                if matched is not None:
                     next_state, clip_name = matched
                     current_state = next_state
                     last_state_time = time.monotonic()
@@ -364,16 +308,6 @@ async def handle_ws(request: web.Request) -> web.WebSocketResponse:
                         )
                 elif should_flush_idle:
                     stream.clear()
-                    if text and not ws.closed:
-                        await ws.send_json(
-                            {
-                                "type": "transcript",
-                                "user_id": user_id,
-                                "state": current_state,
-                                "text": text,
-                                "latency_ms": round(dt_ms, 1),
-                            }
-                        )
 
     task = asyncio.create_task(inference_loop())
     logger.info("WebSocket client connected from %s", request.remote)
@@ -401,12 +335,11 @@ async def handle_ws(request: web.Request) -> web.WebSocketResponse:
 
 def create_app() -> web.Application:
     model, actual_device = load_model()
-    app = web.Application(client_max_size=10 * 1024 * 1024)
+    app = web.Application()
     app["model"] = model
     app["device"] = actual_device
     app["lock"] = asyncio.Lock()
     app.router.add_get("/health", handle_health)
-    app.router.add_post("/transcribe", handle_transcribe)
     app.router.add_get("/ws", handle_ws)
     return app
 
