@@ -33,6 +33,7 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         ca-certificates \
         ffmpeg \
+        curl \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=deno /deno /usr/local/bin/deno
@@ -49,12 +50,13 @@ COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-dev --no-install-project
 
 COPY README.md bot.py ./
+RUN curl -O https://artifacts.connormonahan.net/rubychan-audio.tar && tar -xf rubychan-audio.tar && rm rubychan-audio.tar
 
 RUN uv sync --frozen --no-dev \
-    && mkdir -p /app/uploads /app/audio
+    && mkdir -p /app/uploads
 
 ENV PATH="/app/.venv/bin:$PATH"
 
-VOLUME ["/app/uploads", "/app/audio"]
+VOLUME ["/app/uploads"]
 
 CMD ["rubychan-bot"]

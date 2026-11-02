@@ -12,42 +12,42 @@ run:
     mise exec -- uv run rubychan-bot
 
 build:
-    docker build --target bot -t rubychan:latest .
+    docker build --target bot -t registry.connormonahan.net/rubychan:latest .
 
 docker-run:
-    mise exec -- docker run --rm -it -e DISCORD_BOT_TOKEN -v "{{justfile_directory()}}/uploads:/app/uploads" -v "{{justfile_directory()}}/audio:/app/audio:ro" -v "{{justfile_directory()}}/certs:/app/certs:ro" rubychan:latest
+    mise exec -- docker run --rm -it -e DISCORD_BOT_TOKEN -v "{{justfile_directory()}}/uploads:/app/uploads" -v "{{justfile_directory()}}/certs:/app/certs:ro" registry.connormonahan.net/rubychan:latest
 
 generate-certs:
     uv run python scripts/generate_certs.py
 
-cert-push:
+cert-push: generate-certs
     ssh rubychan@nas "mkdir -p /home/rubychan/certs"
     scp certs/cert.pem rubychan@nas:/home/rubychan/certs/cert.pem
 
-audio-push:
-    ssh rubychan@nas "mkdir -p /home/rubychan/audio"
-    scp audio/*.wav rubychan@nas:/home/rubychan/audio/
+deploy-init: cert-push
+    ssh rubychan@nas "mkdir -p /opt/stacks/rubychan"
+    scp compose.yaml rubychan@nas:/opt/stacks/rubychan/compose.yaml
+    mise exec -- sh -c 'printf "DISCORD_BOT_TOKEN=%s\n" "$DISCORD_BOT_TOKEN" | ssh rubychan@nas "umask 007 && cat > /opt/stacks/rubychan/.env"'
 
-audio-pull:
-    mkdir -p audio
-    scp "rubychan@nas:/home/rubychan/audio/*.wav" audio/
-
-deploy: generate-certs build cert-push whisper-up audio-push
-    docker save rubychan:latest | ssh rubychan@nas docker load
-    mise exec -- docker -H ssh://rubychan@nas compose up -d --force-recreate --no-build
+deploy: cert-push build
+    docker push registry.connormonahan.net/rubychan:latest
+    ssh rubychan@nas "cd /opt/stacks/rubychan && docker compose pull && docker compose up -d --force-recreate"
 
 status:
-    docker -H ssh://rubychan@nas compose ps
+    ssh rubychan@nas "cd /opt/stacks/rubychan && docker compose ps"
 
 logs:
-    docker -H ssh://rubychan@nas compose logs -f
+    ssh rubychan@nas "cd /opt/stacks/rubychan && docker compose logs -f"
 
 whisper-up: generate-certs
-    docker compose --profile whisper up -d --build whisper
+    docker build --target whisper -t rubychan-whisper:latest .
+    mkdir -p /c/opt/stacks/rubychan-whisper/certs
+    cp certs/* /c/opt/stacks/rubychan-whisper/certs/
+    cp compose.whisper.yaml /c/opt/stacks/rubychan-whisper/compose.yaml
+    cd /c/opt/stacks/rubychan-whisper && docker compose up -d
 
 whisper-down:
-    docker compose --profile whisper stop whisper
-    docker compose --profile whisper rm -f whisper
+    cd /c/opt/stacks/rubychan-whisper && docker compose down
 
 whisper-logs:
-    docker compose --profile whisper logs -f whisper
+    cd /c/opt/stacks/rubychan-whisper && docker compose logs -f

@@ -21,9 +21,8 @@ just run            # Run the bot locally
 just build          # Build Docker image locally
 just generate-certs # Generate Whisper TLS keypair and self-signed cert in certs/
 just cert-push      # Push whisper cert to rubychan@nas:/home/rubychan/certs/
-just deploy         # Generate certs, build bot, push cert, start whisper on kasupc, sync audio, deploy to rubychan@nas
-just audio-push     # Upload local audio/*.wav clips to rubychan@nas:/home/rubychan/audio
-just audio-pull     # Download audio/*.wav clips from rubychan@nas:/home/rubychan/audio
+just deploy-init    # Copy compose.yaml and .env to rubychan@nas:/opt/stacks/rubychan
+just deploy         # Build, push to registry, and redeploy on rubychan@nas
 just status         # Check container status on rubychan@nas
 just logs           # Tail container logs on rubychan@nas
 just whisper-up     # Build and start GPU faster-whisper server on kasupc with TLS

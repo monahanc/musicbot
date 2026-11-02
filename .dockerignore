@@ -11,7 +11,6 @@ __pycache__
 build
 dist
 uploads
-audio
 certs
 *.key
 *.pem
