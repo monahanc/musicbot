@@ -32,6 +32,13 @@ docker-push tag=git_hash: build
 
 docker-push-latest: (docker-push "latest")
 
+watchtower-update:
+    curl --fail --show-error -s -X POST \
+        -H "Authorization: Bearer $WATCHTOWER_TOKEN" \
+        "https://dockge.connormonahan.net/watchtower/v1/update?container=rubychan"
+
+deploy-watchtower: docker-push-latest watchtower-update
+
 deploy-init: cert-push
     ssh rubychan@nas "mkdir -p /opt/stacks/rubychan"
     scp compose.yaml rubychan@nas:/opt/stacks/rubychan/compose.yaml

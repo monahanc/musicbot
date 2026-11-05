@@ -7,6 +7,8 @@ services:
       DISCORD_BOT_TOKEN: ${DISCORD_BOT_TOKEN:-}
       WHISPER_URL: https://kasupc:8000
       WHISPER_CERT_FILE: /app/certs/cert.pem
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
     volumes:
       - type: bind
         source: /home/rubychan/uploads

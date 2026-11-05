@@ -14,20 +14,22 @@ DISCORD_BOT_TOKEN = "your-token-here"
 ## Commands
 
 ```sh
-just setup          # Install local Python dependencies with uv
-just test           # Run unit and integration tests
-just format         # Lint and format code with ruff and black
-just run            # Run the bot locally
-just build          # Build Docker image locally
-just generate-certs # Generate Whisper TLS keypair and self-signed cert in certs/
-just cert-push      # Push whisper cert to rubychan@nas:/home/rubychan/certs/
-just deploy-init    # Copy compose.yaml and .env to rubychan@nas:/opt/stacks/rubychan
-just deploy         # Build, push to registry, and redeploy on rubychan@nas
-just status         # Check container status on rubychan@nas
-just logs           # Tail container logs on rubychan@nas
-just whisper-up     # Build and start GPU faster-whisper server on kasupc with TLS
-just whisper-down   # Stop GPU faster-whisper server on kasupc
-just whisper-logs   # Tail GPU faster-whisper server logs on kasupc
+just setup             # Install local Python dependencies with uv
+just test              # Run unit and integration tests
+just format            # Lint and format code with ruff and black
+just run               # Run the bot locally
+just build             # Build Docker image locally
+just generate-certs    # Generate Whisper TLS keypair and self-signed cert in certs/
+just cert-push         # Push whisper cert to rubychan@nas:/home/rubychan/certs/
+just deploy-init       # Copy compose.yaml and .env to rubychan@nas:/opt/stacks/rubychan
+just deploy            # Build, push to registry, and redeploy on rubychan@nas via SSH
+just deploy-watchtower # Push latest to registry and trigger Watchtower update via API
+just watchtower-update # Trigger Watchtower update API for rubychan container
+just status            # Check container status on rubychan@nas
+just logs              # Tail container logs on rubychan@nas
+just whisper-up        # Build and start GPU faster-whisper server on kasupc with TLS
+just whisper-down      # Stop GPU faster-whisper server on kasupc
+just whisper-logs      # Tail GPU faster-whisper server logs on kasupc
 ```
 
 ## Security
