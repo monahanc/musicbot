@@ -29,3 +29,8 @@ jobs:
       - run: just test
 
       - run: just build
+
+      - run: just docker-push
+
+      - run: just docker-push-latest
+        if: github.ref == 'refs/heads/master'
