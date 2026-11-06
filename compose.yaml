@@ -1,13 +1,50 @@
 services:
   rubychan:
+    build:
+      context: .
+      target: bot
     image: rubychan:latest
     container_name: rubychan
     restart: unless-stopped
     environment:
-      DISCORD_BOT_TOKEN: ${DISCORD_BOT_TOKEN:?DISCORD_BOT_TOKEN is required}
+      DISCORD_BOT_TOKEN: ${DISCORD_BOT_TOKEN:-}
+      WHISPER_URL: https://kasupc:8000
+      WHISPER_CERT_FILE: /app/certs/cert.pem
     volumes:
       - type: bind
         source: /home/rubychan/uploads
         target: /app/uploads
+      - type: bind
+        source: /home/rubychan/audio
+        target: /app/audio
+        read_only: true
+      - type: bind
+        source: /home/rubychan/certs
+        target: /app/certs
+        read_only: true
 
-
+  whisper:
+    profiles: ["whisper"]
+    build:
+      context: .
+      target: whisper
+    image: rubychan-whisper:latest
+    container_name: rubychan-whisper
+    restart: always
+    ports:
+      - "8000:8000"
+    volumes:
+      - type: bind
+        source: ./certs
+        target: /certs
+        read_only: true
+    environment:
+      WHISPER_SSL_CERT: /certs/cert.pem
+      WHISPER_SSL_KEY: /certs/key.pem
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]

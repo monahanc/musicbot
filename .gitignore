@@ -12,9 +12,15 @@ dist/
 .env.*
 .config/
 mise.local.toml
+/certs
+certs/
+*.key
+*.pem
+*.crt
 
 # Bot data
 /uploads
+/audio
 
 # Editor / OS
 .vscode/

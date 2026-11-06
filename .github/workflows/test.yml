@@ -12,4 +12,8 @@ jobs:
 
       - uses: jdx/mise-action@v2
 
+      - run: just setup
+
+      - run: just test
+
       - run: just build
