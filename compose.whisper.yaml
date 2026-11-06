@@ -1,0 +1,22 @@
+services:
+  whisper:
+    image: rubychan-whisper:latest
+    container_name: rubychan-whisper
+    restart: always
+    ports:
+      - "8000:8000"
+    volumes:
+      - type: bind
+        source: ./certs
+        target: /certs
+        read_only: true
+    environment:
+      WHISPER_SSL_CERT: /certs/cert.pem
+      WHISPER_SSL_KEY: /certs/key.pem
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
